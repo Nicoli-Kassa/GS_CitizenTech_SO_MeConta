@@ -1,0 +1,45 @@
+# Serviço de monitoramento do servidor Me Conta (instalado por linux/etapas/monitoramento.sh).
+# Ver estado:   systemctl status meconta-monitor   (a linha "Status:" mostra a última medição)
+# Ver alertas:  tail -f /var/log/meconta/alertas.log
+# Recarregar a configuração sem parar: systemctl reload meconta-monitor
+
+[Unit]
+Description=Me Conta - monitor de CPU, memória, disco e saúde da API
+After=network-online.target meconta-api.service
+Wants=network-online.target
+# Nunca desiste de reiniciar.
+StartLimitIntervalSec=0
+
+[Service]
+# "notify": o monitor avisa o systemd quando está pronto e manda sinal de vida a cada medição.
+Type=notify
+NotifyAccess=all
+ExecStart=/usr/local/sbin/meconta-monitor
+ExecReload=/bin/kill -HUP $MAINPID
+SyslogIdentifier=meconta-monitor
+
+# Tolerância a falhas:
+#   - caiu (qualquer motivo, inclusive kill -9)? volta em 5 s;
+#   - travou (não mandou sinal de vida em 60 s)? o watchdog mata e reinicia;
+#   - falta de memória? é o último processo que o kernel escolhe matar.
+Restart=always
+RestartSec=5
+WatchdogSec=60
+OOMScoreAdjust=-900
+Nice=-5
+
+# Pasta em memória para o status.json lido pelo painel (nginx só lê).
+RuntimeDirectory=meconta-monitor
+RuntimeDirectoryMode=0755
+
+# Roda como root porque reinicia a API e avisa os terminais, mas com o resto do sistema somente leitura.
+ProtectSystem=strict
+ReadWritePaths=/var/log/meconta
+ProtectHome=read-only
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+
+[Install]
+WantedBy=multi-user.target

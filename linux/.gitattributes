@@ -1,0 +1,4 @@
+# Os scripts e arquivos de configuração rodam no Linux: sempre com quebra de linha LF,
+# mesmo se o repositório for editado no Windows (CRLF quebra o Bash e o systemd).
+* text=auto eol=lf
+*.png binary

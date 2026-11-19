@@ -1,0 +1,56 @@
+# Serviço da API Me Conta (instalado por linux/etapas/aplicacao.sh).
+# Ver estado:  systemctl status meconta-api
+# Ver logs:    journalctl -u meconta-api -f
+
+[Unit]
+Description=Me Conta API (.NET 10, SQLite)
+Documentation=https://github.com/Nicoli-Kassa/GS_CitizenTech_API_MeConta
+After=network-online.target
+Wants=network-online.target
+# Nunca desiste de reiniciar (o atraso entre tentativas cresce até 60 s, ver RestartSteps).
+StartLimitIntervalSec=0
+
+[Service]
+Type=exec
+User={{USUARIO_DO_SERVICO}}
+Group={{USUARIO_DO_SERVICO}}
+WorkingDirectory=/opt/meconta/app
+ExecStart=/opt/meconta/app/MeConta.Api
+EnvironmentFile=/etc/meconta/api.env
+SyslogIdentifier=meconta-api
+
+# Tolerância a falhas: se o processo cair por qualquer motivo, o systemd sobe de novo.
+Restart=always
+RestartSec=3
+RestartSteps=5
+RestartMaxDelaySec=60
+TimeoutStopSec=20
+
+# Limites de recursos: a B1s tem 1 GB de RAM; a API não pode levar a máquina junto se vazar memória.
+MemoryHigh=500M
+MemoryMax=700M
+TasksMax=200
+
+# Isolamento (princípio do menor privilégio).
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+ProtectSystem=strict
+ReadWritePaths=/var/lib/meconta
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+UMask=0027
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,44 @@
+## Regras de auditoria do servidor Me Conta (instaladas por linux/etapas/auditoria.sh)
+## Consultar:  sudo ausearch -k <chave> -i      Resumo: sudo bash linux/ferramentas/auditoria.sh
+##
+## -w <caminho> -p <permissões> -k <chave>   observa um arquivo ou pasta
+##    permissões: r = leitura, w = escrita, x = execução, a = mudança de atributo (dono, permissão)
+## auid = "audit user id": o usuário que fez login, mesmo depois de um sudo.
+
+# Contas e privilégios
+-w /etc/passwd -p wa -k identidade
+-w /etc/group -p wa -k identidade
+-w /etc/shadow -p wa -k identidade
+-w /etc/sudoers -p wa -k privilegios
+-w /etc/sudoers.d/ -p wa -k privilegios
+
+# Acesso remoto
+-w /etc/ssh/sshd_config -p wa -k ssh
+-w /etc/ssh/sshd_config.d/ -p wa -k ssh
+
+# Rede, DNS e firewall
+-w /etc/hosts -p wa -k rede
+-w /etc/hostname -p wa -k rede
+-w /etc/netplan/ -p wa -k rede
+-w /etc/systemd/resolved.conf.d/ -p wa -k rede
+-w /etc/ufw/ -p wa -k firewall
+
+# Me Conta: configuração, segredos (inclusive leitura), serviços, versões publicadas e servidor web
+-w /etc/meconta/ -p wa -k meconta-config
+-w /etc/meconta/segredos/ -p rwa -k meconta-segredos
+-w /etc/systemd/system/meconta-api.service -p wa -k meconta-servicos
+-w /etc/systemd/system/meconta-monitor.service -p wa -k meconta-servicos
+-w /etc/systemd/system/meconta-api.service.d/ -p wa -k meconta-servicos
+-w /usr/local/sbin/meconta-monitor -p wa -k meconta-servicos
+-w /opt/meconta/versoes/ -p wa -k meconta-publicacao
+-w /etc/nginx/ -p wa -k nginx
+
+# Quem parou, iniciou ou reiniciou serviços
+-w /usr/bin/systemctl -p x -k systemctl
+
+# Todo comando executado por uma pessoa logada (auid >= 1000), inclusive com sudo
+-a always,exit -F arch=b64 -S execve -F auid>=1000 -F auid!=unset -k comandos
+-a always,exit -F arch=b32 -S execve -F auid>=1000 -F auid!=unset -k comandos
+
+# Logs do Me Conta apagados, renomeados ou truncados por uma pessoa
+-a always,exit -F arch=b64 -S unlink,unlinkat,rename,renameat,truncate -F dir=/var/log/meconta -F auid>=1000 -F auid!=unset -k meconta-logs

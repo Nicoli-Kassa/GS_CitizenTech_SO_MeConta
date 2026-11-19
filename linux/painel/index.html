@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Me Conta · Servidor</title>
+<style>
+  :root {
+    --papel: #f6efdf; --cartao: #fffaf0; --tinta: #3b2f2a; --suave: #6b5a4e;
+    --marrom: #8b5e3c; --ok: #2f6b3e; --alerta: #a3321f; --trilho: #e6dac2;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--papel); color: var(--tinta);
+    font: 16px/1.5 Georgia, "Times New Roman", serif;
+  }
+  main { max-width: 920px; margin: 0 auto; padding: 32px 20px 48px; }
+  h1 { margin: 0; font-size: 1.9rem; }
+  .sub { margin: 4px 0 24px; color: var(--suave); }
+  .grade { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+  .cartao {
+    background: var(--cartao); border: 1px solid #e2d4b8; border-radius: 10px;
+    padding: 18px 20px; box-shadow: 0 1px 2px rgba(59, 47, 42, .08);
+  }
+  .rotulo { font-size: .95rem; color: var(--suave); margin: 0 0 6px; }
+  .valor { font-size: 2.4rem; font-weight: bold; margin: 0; font-variant-numeric: tabular-nums; }
+  .barra { position: relative; height: 12px; background: var(--trilho); border-radius: 6px; margin-top: 10px; overflow: hidden; }
+  .barra span { display: block; height: 100%; background: var(--marrom); transition: width .6s ease; }
+  .barra i { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--tinta); }
+  .limite { font-size: .85rem; color: var(--suave); margin-top: 6px; }
+  .acima .valor { color: var(--alerta); }
+  .acima .barra span { background: var(--alerta); }
+  .servicos { list-style: none; margin: 0; padding: 0; }
+  .servicos li { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px dashed #e2d4b8; }
+  .servicos li:last-child { border-bottom: 0; }
+  .estado-ok { color: var(--ok); font-weight: bold; }
+  .estado-ruim { color: var(--alerta); font-weight: bold; }
+  h2 { font-size: 1.2rem; margin: 28px 0 10px; }
+  ol { margin: 0; padding-left: 0; list-style: none; font-family: "Courier New", monospace; font-size: .88rem; }
+  ol li { padding: 8px 10px; border-left: 4px solid var(--trilho); background: var(--cartao); margin-bottom: 6px; border-radius: 4px; overflow-wrap: anywhere; }
+  ol li.ALERTA, ol li.ACAO { border-left-color: var(--alerta); }
+  ol li.NORMAL { border-left-color: var(--ok); }
+  footer { margin-top: 28px; font-size: .85rem; color: var(--suave); }
+  @media (prefers-reduced-motion: reduce) { .barra span { transition: none; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Servidor do Me Conta</h1>
+  <p class="sub" id="identidade">Carregando…</p>
+
+  <div class="grade" aria-live="polite">
+    <section class="cartao" id="cpu"><p class="rotulo">CPU</p><p class="valor">–</p>
+      <div class="barra" aria-hidden="true"><span></span><i></i></div><p class="limite"></p></section>
+    <section class="cartao" id="memoria"><p class="rotulo">Memória</p><p class="valor">–</p>
+      <div class="barra" aria-hidden="true"><span></span><i></i></div><p class="limite"></p></section>
+    <section class="cartao" id="disco"><p class="rotulo">Disco</p><p class="valor">–</p>
+      <div class="barra" aria-hidden="true"><span></span><i></i></div><p class="limite"></p></section>
+    <section class="cartao"><p class="rotulo">Serviços</p><ul class="servicos" id="servicos"></ul></section>
+  </div>
+
+  <h2>Últimos eventos do monitor</h2>
+  <ol id="eventos"></ol>
+
+  <footer>Atualiza sozinho a cada 5 segundos. Dados do serviço <code>meconta-monitor</code>.</footer>
+</main>
+<script>
+  const nomes = { api_health: "API (/health)", "meconta-api": "Serviço meconta-api", nginx: "nginx" };
+
+  function mostrarRecurso(id, dados) {
+    const cartao = document.getElementById(id);
+    const acima = dados.uso >= dados.limite;
+    cartao.classList.toggle("acima", acima);
+    cartao.querySelector(".valor").textContent = dados.uso + "%";
+    cartao.querySelector(".barra span").style.width = Math.min(dados.uso, 100) + "%";
+    cartao.querySelector(".barra i").style.left = dados.limite + "%";
+    cartao.querySelector(".limite").textContent =
+      (acima ? "Acima do limite de " : "Limite de alerta: ") + dados.limite + "%";
+  }
+
+  function mostrarServicos(servicos) {
+    const lista = document.getElementById("servicos");
+    lista.replaceChildren(...Object.entries(servicos).map(([nome, estado]) => {
+      const item = document.createElement("li");
+      const bom = estado === "active" || estado === "ok";
+      const rotulo = document.createElement("span");
+      rotulo.textContent = nomes[nome] || nome;
+      const valor = document.createElement("span");
+      valor.className = bom ? "estado-ok" : "estado-ruim";
+      valor.textContent = bom ? "no ar" : estado;
+      item.append(rotulo, valor);
+      return item;
+    }));
+  }
+
+  function mostrarEventos(eventos) {
+    const lista = document.getElementById("eventos");
+    if (!eventos.length) { lista.innerHTML = "<li>Nenhum evento ainda.</li>"; return; }
+    lista.replaceChildren(...eventos.map(linha => {
+      const item = document.createElement("li");
+      const tipo = (linha.split("|")[1] || "").trim();
+      item.className = tipo;
+      item.textContent = linha;
+      return item;
+    }));
+  }
+
+  async function atualizar() {
+    try {
+      const resposta = await fetch("status.json", { cache: "no-store" });
+      if (!resposta.ok) throw new Error(resposta.status);
+      const s = await resposta.json();
+      document.getElementById("identidade").textContent =
+        `${s.servidor} · medido às ${s.horario.slice(11)} · ligado desde ${s.ligado_desde} · carga ${s.carga}`;
+      mostrarRecurso("cpu", s.recursos.cpu);
+      mostrarRecurso("memoria", s.recursos.memoria);
+      mostrarRecurso("disco", s.recursos.disco);
+      mostrarServicos(s.servicos);
+      mostrarEventos(s.ultimos_eventos);
+    } catch (erro) {
+      document.getElementById("identidade").textContent =
+        "Sem dados do monitor agora (" + erro.message + "). O serviço pode estar reiniciando.";
+    }
+  }
+
+  atualizar();
+  setInterval(atualizar, 5000);
+</script>
+</body>
+</html>
